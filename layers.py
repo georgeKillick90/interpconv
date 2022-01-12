@@ -5,7 +5,6 @@ import torch.nn.functional as F
 from scipy.spatial import cKDTree
 import torch.jit as jit
 
-
 def support(points, sample_locs, k):
     tree = cKDTree(points)
     dist, idx = tree.query(sample_locs, k)
@@ -16,6 +15,21 @@ def support(points, sample_locs, k):
     # Normalize the patch to lie within a unit circle
     new_points = points / dist.max(axis=1)[:,np.newaxis, np.newaxis]
     return new_points, torch.tensor(idx, dtype=torch.long)
+
+class WeightNet(nn.Module):
+    def __init__(self, output_size, hidden_size, omega):
+        super().__init__()
+        self.output_size = output_size
+        self.fc1 = nn.Linear(2, hidden_size)
+        self.fc2 = nn.Linear(hidden_size, self.output_size)
+        self.omega = omega
+    
+    def forward(self, x):
+        n, k, _ = x.shape
+        x = torch.sin(self.fc1(x) * self.omega)
+        x = self.fc2(x)
+        x = x.view(n, k, self.output_size)
+        return x
 
 class MaxPoolNG(jit.ScriptModule):
     def __init__(self, k, locs_in, locs_out):
@@ -40,7 +54,7 @@ class AvgPoolNG(jit.ScriptModule):
         return x
 
 class InterpConv(jit.ScriptModule):
-    def __init__(self, in_channels, out_channels, k, locs_in, locs_out, weight_net):
+    def __init__(self, in_channels, out_channels, k, locs_in, locs_out, weight_net=None):
         super().__init__()
 
         # support regions / image patches and each pixel's corresponding spatial offset
@@ -50,7 +64,10 @@ class InterpConv(jit.ScriptModule):
         self.register_buffer('unfold_idx', self.s_idx)
 
         # Network that computes filter weights from spatial coordinates
-        self.weight_net = weight_net
+        if weight_net = None:
+            self.weight_net = WeightNet(k, 32, omega=6):
+        else:
+            self.weight_net = weight_net
         
         # Conv Kernel
         self.kernel = nn.Parameter(torch.rand((out_channels, in_channels, k)))

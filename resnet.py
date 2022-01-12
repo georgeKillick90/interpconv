@@ -4,29 +4,16 @@ import torch.jit as jit
 from layers import *
 from utils import *
 
-class WeightNet(nn.Module):
-    def __init__(self, output_size, hidden_size, omega):
-        super().__init__()
-        self.output_size = output_size
-        self.fc1 = nn.Linear(2, hidden_size)
-        self.fc2 = nn.Linear(hidden_size, self.output_size)
-        self.omega = omega
-    
-    def forward(self, x):
-        n, k, _ = x.shape
-        x = torch.sin(self.fc1(x) * self.omega)
-        x = self.fc2(x)
-        x = x.view(n, k, self.output_size)
-        return x
 
 class BasicBlock(nn.Module):
-    def __init__(self, inplanes, planes, in_locs, out_locs, weight_net):
+    def __init__(self, inplanes, planes, in_locs, out_locs):
         super().__init__()
 
+
         conv = InterpConv
-        self.conv1 = conv(inplanes, planes, 9, in_locs, out_locs, weight_net)
+        self.conv1 = conv(inplanes, planes, 9, in_locs, out_locs)
         self.bn1 = nn.BatchNorm1d(planes)
-        self.conv2 = conv(planes, planes, 9, out_locs, out_locs, weight_net)
+        self.conv2 = conv(planes, planes, 9, out_locs, out_locs)
         self.bn2 = nn.BatchNorm1d(planes)
         self.activation = nn.ReLU(inplace=True)
 
@@ -53,12 +40,12 @@ class BasicBlock(nn.Module):
         return out
 
 class Stem(nn.Module):
-    def __init__(self, l1, l2, l3, weight_net):
+    def __init__(self, l1, l2, l3):
         super().__init__()
         conv = InterpConv
-        self.conv1 = conv(3, 32, 9, l1, l2, weight_net)
-        self.conv2 = conv(32, 32, 9, l2, l2, weight_net)
-        self.conv3 = conv(32, 64, 9, l2, l2, weight_net)
+        self.conv1 = conv(3, 32, 9, l1, l2)
+        self.conv2 = conv(32, 32, 9, l2, l2)
+        self.conv3 = conv(32, 64, 9, l2, l2)
         self.pool = MaxPoolNG(4, l2, l3)
         self.bn1 = nn.BatchNorm1d(32)
         self.bn2 = nn.BatchNorm1d(32)
@@ -85,25 +72,24 @@ class ResNet18NG(nn.Module):
     def __init__(self, input_locs, n_classes):
         super().__init__()
         l1 = torch.tensor(input_locs.clone(), dtype=torch.float32).clone()
-        l2 = torch.tensor(fibonacci_retina(2048, 0.1, 1.6).clone(), dtype=torch.float32).clone().detach() #* 0.9
-        l3 = torch.tensor(fibonacci_retina(512, 0.1, 1.6).clone() , dtype=torch.float32).clone().detach()# * 0.8
-        l4 = torch.tensor(fibonacci_retina(128, 0.1, 1.6).clone(), dtype=torch.float32).clone().detach() #* 0.7
-        l5 = torch.tensor(fibonacci_retina(32, 0.1, 1.6).clone(), dtype=torch.float32).clone().detach() #* 0.6
-        l6 = torch.tensor(fibonacci_retina(9, 0.1, 1.6).clone(), dtype=torch.float32).clone().detach() #*0.5
+        l2 = torch.tensor(fibonacci_retina(2048, 0.1, 1.6).clone(), dtype=torch.float32).clone().detach() * 0.9
+        l3 = torch.tensor(fibonacci_retina(512, 0.1, 1.6).clone() , dtype=torch.float32).clone().detach() * 0.8
+        l4 = torch.tensor(fibonacci_retina(128, 0.1, 1.6).clone(), dtype=torch.float32).clone().detach() * 0.7
+        l5 = torch.tensor(fibonacci_retina(32, 0.1, 1.6).clone(), dtype=torch.float32).clone().detach() * 0.6
+        l6 = torch.tensor(fibonacci_retina(9, 0.1, 1.6).clone(), dtype=torch.float32).clone().detach() *0.5
 
-        self.filter_network = WeightNet(9, 64, 6)
-        self.stem = Stem(l1, l2, l3, self.filter_network)
-        self.block1_1 = BasicBlock(64, 64, l3, l3, self.filter_network)
-        self.block1_2 = BasicBlock(64, 64, l3, l3, self.filter_network)
+        self.stem = Stem(l1, l2, l3)
+        self.block1_1 = BasicBlock(64, 64, l3, l3)
+        self.block1_2 = BasicBlock(64, 64, l3, l3)
 
-        self.block2_1 = BasicBlock(64, 128, l3, l4, self.filter_network)
-        self.block2_2 = BasicBlock(128, 128, l4, l4, self.filter_network)
+        self.block2_1 = BasicBlock(64, 128, l3, l4)
+        self.block2_2 = BasicBlock(128, 128, l4, l4)
 
-        self.block3_1 = BasicBlock(128, 256, l4, l5, self.filter_network)
-        self.block3_2 = BasicBlock(256, 256, l5, l5, self.filter_network)
+        self.block3_1 = BasicBlock(128, 256, l4, l5)
+        self.block3_2 = BasicBlock(256, 256, l5, l5)
         
-        self.block4_1 = BasicBlock(256, 512, l5, l6, self.filter_network)
-        self.block4_2 = BasicBlock(512, 512, l6, l6, self.filter_network)
+        self.block4_1 = BasicBlock(256, 512, l5, l6)
+        self.block4_2 = BasicBlock(512, 512, l6, l6)
         
         self.gap = nn.AdaptiveAvgPool1d(1)
 
