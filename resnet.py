@@ -19,7 +19,7 @@ class WeightNet(nn.Module):
         x = x.view(n, k, self.output_size)
         return x
 
-class BasicBlock(Jit.ScriptModule):
+class BasicBlock(jit.ScriptModule):
     def __init__(self, inplanes, planes, in_locs, out_locs, weight_net):
         super().__init__()
 
@@ -53,7 +53,7 @@ class BasicBlock(Jit.ScriptModule):
         out = self.activation(out)
         return out
 
-class Stem(Jit.ScriptModule):
+class Stem(jit.ScriptModule):
     def __init__(self, l1, l2, l3, weight_net):
         super().__init__()
         conv = InterpConv
@@ -83,7 +83,7 @@ class Stem(Jit.ScriptModule):
         x = self.pool(x)
         return x
 
-class ResNet18NG(Jit.ScriptModule):
+class ResNet18NG(jit.ScriptModule):
     def __init__(self, input_locs, n_classes):
         super().__init__()
         l1 = torch.tensor(input_locs.clone(), dtype=torch.float32).clone()

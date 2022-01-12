@@ -17,7 +17,7 @@ def support(points, sample_locs, k):
     new_points = points / dist.max(axis=1)[:,np.newaxis, np.newaxis]
     return new_points, torch.tensor(idx, dtype=torch.long)
 
-class MaxPoolNG(Jit.ScriptModule):
+class MaxPoolNG(jit.ScriptModule):
     def __init__(self, k, locs_in, locs_out):
         super().__init__()
         self.register_buffer('idx', support(locs_in, locs_out, k)[1])
@@ -28,7 +28,7 @@ class MaxPoolNG(Jit.ScriptModule):
         x = x.max(-1)[0]
         return x
 
-class AvgPoolNG(Jit.ScriptModule):
+class AvgPoolNG(jit.ScriptModule):
     def __init__(self, k, locs_in, locs_out):
         super().__init__()
         self.register_buffer('idx', support(locs_in, locs_out, k)[1])
@@ -39,7 +39,7 @@ class AvgPoolNG(Jit.ScriptModule):
         x = x.mean(-1)
         return x
 
-class InterpConv(Jit.ScriptModule):
+class InterpConv(jit.ScriptModule):
     def __init__(self, in_channels, out_channels, k, locs_in, locs_out, weight_net):
         super().__init__()
 
