@@ -1,7 +1,6 @@
 import numpy as np
 import torch 
 
-
 def cart2pol(coords):
     x = coords[:,0]
     y = coords[:,1]
@@ -41,3 +40,26 @@ def normalize(points):
 
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+
+class RetinaTransform(object):
+    def __init__(self, retina, size, fixation=None, backproject=True):
+
+        self.backproject = backproject
+        self.retina = retina
+        self.size = size
+
+        if (fixation == None):
+            self.fixation = (size[0] / 2. , size[1] / 2.)
+        else:
+            self.fixation = fixation
+
+        self.retina.prepare(self.size, self.fixation)
+
+    def __call__(self, sample):
+        sample = self.retina.sample(sample.permute(1,2,0).numpy() * 255., self.fixation)
+
+        if (self.backproject):
+          sample = self.retina.backproject_last()
+        
+        return torch.tensor(sample.T).float() / 255.

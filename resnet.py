@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.jit as jit
 from layers import *
 from utils import *
 
@@ -18,7 +19,7 @@ class WeightNet(nn.Module):
         x = x.view(n, k, self.output_size)
         return x
 
-class BasicBlock(nn.Module):
+class BasicBlock(Jit.ScriptModule):
     def __init__(self, inplanes, planes, in_locs, out_locs, weight_net):
         super().__init__()
 
@@ -36,6 +37,7 @@ class BasicBlock(nn.Module):
         if inplanes != planes:
             self.expand = nn.Conv1d(inplanes, planes, 1)
 
+    @jit.script_method
     def forward(self, x):
         identity = x
         out = self.conv1(x)
@@ -51,7 +53,7 @@ class BasicBlock(nn.Module):
         out = self.activation(out)
         return out
 
-class Stem(nn.Module):
+class Stem(Jit.ScriptModule):
     def __init__(self, l1, l2, l3, weight_net):
         super().__init__()
         conv = InterpConv
@@ -64,6 +66,7 @@ class Stem(nn.Module):
         self.bn3 = nn.BatchNorm1d(64)
         self.act = nn.ReLU(inplace=True)
 
+    @jit.script_method
     def forward(self, x):
         x = self.conv1(x)
         x = self.bn1(x)
@@ -80,7 +83,7 @@ class Stem(nn.Module):
         x = self.pool(x)
         return x
 
-class ResNet18NG(nn.Module):
+class ResNet18NG(Jit.ScriptModule):
     def __init__(self, input_locs, n_classes):
         super().__init__()
         l1 = torch.tensor(input_locs.clone(), dtype=torch.float32).clone()
@@ -108,6 +111,7 @@ class ResNet18NG(nn.Module):
 
         self.fc = nn.Linear(512, n_classes)
     
+    @jit.script_method
     def forward(self, x):
         x = self.stem(x)
 

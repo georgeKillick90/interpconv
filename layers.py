@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from scipy.spatial import cKDTree
+import torch.jit as jit
 
 
 def support(points, sample_locs, k):
@@ -16,27 +17,29 @@ def support(points, sample_locs, k):
     new_points = points / dist.max(axis=1)[:,np.newaxis, np.newaxis]
     return new_points, torch.tensor(idx, dtype=torch.long)
 
-class MaxPoolNG(nn.Module):
+class MaxPoolNG(Jit.ScriptModule):
     def __init__(self, k, locs_in, locs_out):
         super().__init__()
         self.register_buffer('idx', support(locs_in, locs_out, k)[1])
     
+    @jit.script_method
     def forward(self, x):
         x = x[:,:, self.idx]
         x = x.max(-1)[0]
         return x
 
-class AvgPoolNG(nn.Module):
+class AvgPoolNG(Jit.ScriptModule):
     def __init__(self, k, locs_in, locs_out):
         super().__init__()
         self.register_buffer('idx', support(locs_in, locs_out, k)[1])
     
+    @jit.script_method
     def forward(self, x):
         x = x[:,:, self.idx]
         x = x.mean(-1)
         return x
 
-class InterpConv(nn.Module):
+class InterpConv(Jit.ScriptModule):
     def __init__(self, in_channels, out_channels, k, locs_in, locs_out, weight_net):
         super().__init__()
 
@@ -57,6 +60,7 @@ class InterpConv(nn.Module):
         # Batch Norm to manage expliding gradients
         self.bn = nn.BatchNorm1d(out_channels)
 
+    @jit.script_method
     def forward(self, x):
         # 'Unfold' image
         x = x[ :, :, self.unfold_idx]
