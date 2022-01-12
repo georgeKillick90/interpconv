@@ -83,12 +83,12 @@ class Stem(nn.Module):
 class ResNet18NG(nn.Module):
     def __init__(self, input_locs, n_classes):
         super().__init__()
-        l1 = torch.tensor(input_locs, dtype=torch.float32).clone()
-        l2 = torch.tensor(fibonacci_retina(2048, 0.1, 1.6), dtype=torch.float32).clone().detach() #* 0.9
-        l3 = torch.tensor(fibonacci_retina(512, 0.1, 1.6) , dtype=torch.float32).clone().detach()# * 0.8
-        l4 = torch.tensor(fibonacci_retina(128, 0.1, 1.6), dtype=torch.float32).clone().detach() #* 0.7
-        l5 = torch.tensor(fibonacci_retina(32, 0.1, 1.6), dtype=torch.float32).clone().detach() #* 0.6
-        l6 = torch.tensor(fibonacci_retina(9, 0.1, 1.6), dtype=torch.float32).clone().detach() #*0.5
+        l1 = torch.tensor(input_locs.clone(), dtype=torch.float32).clone()
+        l2 = torch.tensor(fibonacci_retina(2048, 0.1, 1.6).clone(), dtype=torch.float32).clone().detach() #* 0.9
+        l3 = torch.tensor(fibonacci_retina(512, 0.1, 1.6).clone() , dtype=torch.float32).clone().detach()# * 0.8
+        l4 = torch.tensor(fibonacci_retina(128, 0.1, 1.6).clone(), dtype=torch.float32).clone().detach() #* 0.7
+        l5 = torch.tensor(fibonacci_retina(32, 0.1, 1.6).clone(), dtype=torch.float32).clone().detach() #* 0.6
+        l6 = torch.tensor(fibonacci_retina(9, 0.1, 1.6).clone(), dtype=torch.float32).clone().detach() #*0.5
 
         self.filter_network = WeightNet(9, 64, 6)
         self.stem = Stem(l1, l2, l3, self.filter_network)
