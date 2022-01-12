@@ -64,7 +64,7 @@ class InterpConv(jit.ScriptModule):
         self.register_buffer('unfold_idx', self.s_idx)
 
         # Network that computes filter weights from spatial coordinates
-        if weight_net = None:
+        if weight_net is None:
             self.weight_net = WeightNet(k, 32, omega=6):
         else:
             self.weight_net = weight_net
