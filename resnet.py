@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from layers import InterpConv, AvgPoolNG
+from layers import *
 from utils import *
 
 class WeightNet(nn.Module):
