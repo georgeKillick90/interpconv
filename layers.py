@@ -41,7 +41,7 @@ class InterpConv(nn.Module):
 
         # support regions / image patches and each pixel's corresponding spatial offset
         # from the center of the patch
-        self.s_locs, self.s_idx = support(locs_in, locs_out, self.k)
+        self.s_locs, self.s_idx = support(locs_in, locs_out, k)
         self.s_locs = nn.Parameter(self.s_locs.type(torch.float32), requires_grad=True)
         self.register_buffer('unfold_idx', self.s_idx)
 
@@ -60,7 +60,6 @@ class InterpConv(nn.Module):
         # 'Unfold' image
         x = x[ :, :, self.unfold_idx]
         B, I, N, K = x.shape
-
         # Compute interpolation kernels using the weight_net
         weights = self.weight_net(self.s_locs.clone().detach().requires_grad_(True))
         weights = weights.view(N, K, K)
