@@ -3,7 +3,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from scipy.spatial import cKDTree
-import torch.jit as jit
 
 def support(points, sample_locs, k):
     tree = cKDTree(points)
@@ -31,29 +30,27 @@ class WeightNet(nn.Module):
         x = x.view(n, k, self.output_size)
         return x
 
-class MaxPoolNG(jit.ScriptModule):
+class MaxPoolNG(nn.Module):
     def __init__(self, k, locs_in, locs_out):
         super().__init__()
         self.register_buffer('idx', support(locs_in, locs_out, k)[1])
     
-    @jit.script_method
     def forward(self, x):
         x = x[:,:, self.idx]
         x = x.max(-1)[0]
         return x
 
-class AvgPoolNG(jit.ScriptModule):
+class AvgPoolNG(nn.Module):
     def __init__(self, k, locs_in, locs_out):
         super().__init__()
         self.register_buffer('idx', support(locs_in, locs_out, k)[1])
     
-    @jit.script_method
     def forward(self, x):
         x = x[:,:, self.idx]
         x = x.mean(-1)
         return x
 
-class InterpConv(jit.ScriptModule):
+class InterpConv(nn.Module):
     def __init__(self, in_channels, out_channels, k, locs_in, locs_out, hidden_size=32, omega=6):
         super().__init__()
 
@@ -75,7 +72,6 @@ class InterpConv(jit.ScriptModule):
         # Batch Norm to manage expliding gradients
         self.bn = nn.BatchNorm1d(out_channels)
 
-    @jit.script_method
     def forward(self, x):
         # 'Unfold' image
         x = x[ :, :, self.unfold_idx]
@@ -97,7 +93,7 @@ class InterpConv(jit.ScriptModule):
         return x
 
 
-class MCConv(jit.ScriptModule):
+class MCConv(nn.Module):
     def __init__(self, in_channels, out_channels, k, locs_in, locs_out, hidden_size=32, omega=6):
         super().__init__()
 
@@ -116,7 +112,6 @@ class MCConv(jit.ScriptModule):
         # Batch Norm to manage expliding gradients
         self.bn = nn.BatchNorm1d(out_channels)
 
-    @jit.script_method
     def forward(self, x):
         # 'Unfold' image
         x = x[ :, :, self.unfold_idx]
@@ -131,7 +126,7 @@ class MCConv(jit.ScriptModule):
         return x
 
 
-class MCConvEff(jit.ScriptModule):
+class MCConvEff(nn.Module):
     def __init__(self, in_channels, out_channels, k, locs_in, locs_out, hidden_size=32):
         super().__init__()
 
@@ -148,7 +143,6 @@ class MCConvEff(jit.ScriptModule):
         # Batch Norm to manage expliding gradients
         self.bn = nn.BatchNorm1d(out_channels)
 
-    @jit.script_method
     def forward(self, x):
         # 'Unfold' image
         x = x[ :, :, self.unfold_idx]
