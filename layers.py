@@ -54,7 +54,7 @@ class AvgPoolNG(jit.ScriptModule):
         return x
 
 class InterpConv(jit.ScriptModule):
-    def __init__(self, in_channels, out_channels, k, locs_in, locs_out, weight_net=None):
+    def __init__(self, in_channels, out_channels, k, locs_in, locs_out, hidden_size=32, omega=6):
         super().__init__()
 
         # support regions / image patches and each pixel's corresponding spatial offset
@@ -64,13 +64,11 @@ class InterpConv(jit.ScriptModule):
         self.register_buffer('unfold_idx', self.s_idx)
 
         # Network that computes filter weights from spatial coordinates
-        if weight_net is None:
-            self.weight_net = WeightNet(k, 32, omega=6)
-        else:
-            self.weight_net = weight_net
+        self.weight_net = WeightNet(k, hidden_size, omega)
+
         
         # Conv Kernel
-        self.kernel = nn.Parameter(torch.rand((out_channels, in_channels, k)))
+        self.kernel = nn.Parameter(torch.rand((out_channels, in_channels * k)))
         nn.init.xavier_uniform_(self.kernel)
 
         # TODO: Remove this batch norm by sorting by normalizing output of weight_net
@@ -86,18 +84,80 @@ class InterpConv(jit.ScriptModule):
         weights = self.weight_net(self.s_locs.clone().detach().requires_grad_(True))
         weights = weights.view(N, K, K)
 
-        # b: batch
-        # i: in_channels
-        # o: out_channels
-        # n: size of feature map / number of pixels
-        # k: interpolation kernel size
-        # s: conv kernel size
-
         # Interpolate
         x = torch.einsum('bink,nks->bins', x, weights)
+        
         # Convolve
-        x = torch.einsum('bins,ois->bon', x, self.kernel)
+        x = x.permute(0, 2, 1, 3)
+        x = x.view(B, N, -1)
+        x = torch.matmul(x, self.kernel.permute(1,0))
 
+        x = self.bn(x.permute(0,2,1))
+
+        return x
+
+
+class MCConv(jit.ScriptModule):
+    def __init__(self, in_channels, out_channels, k, locs_in, locs_out, hidden_size=32, omega=6):
+        super().__init__()
+
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+
+        # support regions / image patches and each pixel's corresponding spatial offset
+        # from the center of the patch
+        self.s_locs, self.s_idx = support(locs_in, locs_out, k)
+        self.s_locs = nn.Parameter(self.s_locs.type(torch.float32), requires_grad=True)
+        self.register_buffer('unfold_idx', self.s_idx)
+
+        self.weight_net = WeightNet(in_channels * out_channels, hidden_size, omega)
+        
+        # TODO: Remove this batch norm by sorting by normalizing output of weight_net
+        # Batch Norm to manage expliding gradients
+        self.bn = nn.BatchNorm1d(out_channels)
+
+    @jit.script_method
+    def forward(self, x):
+        # 'Unfold' image
+        x = x[ :, :, self.unfold_idx]
+        B, I, N, K = x.shape
+        # Compute interpolation kernels using the weight_net
+        weights = self.weight_net(self.s_locs.clone().detach().requires_grad_(True))
+        weights = weights.view(N, K, self.in_channels, self.out_channels)
+
+        x = torch.einsum('bink,nkio->bon', x, weights)
         x = self.bn(x)
+      
+        return x
 
+
+class MCConvEff(jit.ScriptModule):
+    def __init__(self, in_channels, out_channels, k, locs_in, locs_out, hidden_size=32):
+        super().__init__()
+
+        # support regions / image patches and each pixel's corresponding spatial offset
+        # from the center of the patch
+        self.s_locs, self.s_idx = support(locs_in, locs_out, k)
+        self.s_locs = nn.Parameter(self.s_locs.type(torch.float32), requires_grad=True)
+        self.register_buffer('unfold_idx', self.s_idx)
+
+        self.basis_functions = nn.Linear(2, hidden_size)
+        self.conv1x1 = nn.Linear(in_channels * hidden_size, out_channels)
+        
+        # TODO: Remove this batch norm by sorting by normalizing output of weight_net
+        # Batch Norm to manage expliding gradients
+        self.bn = nn.BatchNorm1d(out_channels)
+
+    @jit.script_method
+    def forward(self, x):
+        # 'Unfold' image
+        x = x[ :, :, self.unfold_idx]
+        B, I, N, K = x.shape
+        # Compute interpolation kernels using the weight_net
+        weights = self.basis_functions(self.s_locs.clone().detach().requires_grad_(True))
+        weights = torch.sin(weights)
+        x = torch.einsum('bink,nkf->bnfi', x, weights).reshape(B, N, -1)
+        
+        x = self.conv1x1(x).permute(0,2,1)
+        x = self.bn(x)      
         return x
